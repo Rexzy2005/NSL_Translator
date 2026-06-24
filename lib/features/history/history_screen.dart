@@ -63,6 +63,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final sessions = <String, List<TranslationEntry>>{};
+    for (final entry in _items) {
+      sessions.putIfAbsent(entry.sessionId, () => []).add(entry);
+    }
+    final sessionEntries = sessions.entries.toList()
+      ..sort(
+          (a, b) => b.value.first.timestamp.compareTo(a.value.first.timestamp));
+
     return Scaffold(
       body: SafeArea(
         child: RefreshIndicator(
@@ -78,13 +86,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 )
               : ListView.builder(
                   padding: const EdgeInsets.all(16),
-                  itemCount: _items.length + 1,
+                  itemCount: sessionEntries.length + 1,
                   itemBuilder: (context, index) {
                     if (index == 0) {
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 16),
                         child: Text(
-                          '${_items.length} translations',
+                          '${sessionEntries.length} sessions',
                           style: Theme.of(context)
                               .textTheme
                               .headlineSmall
@@ -92,25 +100,42 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         ),
                       );
                     }
-                    final entry = _items[index - 1];
-                    return Dismissible(
-                      key: ValueKey(entry.id),
-                      background: Container(
-                        alignment: Alignment.centerRight,
-                        padding: const EdgeInsets.only(right: 20),
-                        color: Theme.of(context).colorScheme.error,
-                        child: const Icon(Icons.delete_outline,
-                            color: Colors.white),
-                      ),
-                      confirmDismiss: (_) async {
-                        await _delete(entry);
-                        return false;
-                      },
-                      child: HistoryCardWidget(
-                        entry: entry,
-                        onTap: () => context
-                            .read<TranslationProvider>()
-                            .speak(entry.signLabel),
+                    final session = sessionEntries[index - 1];
+                    final latest = session.value.first;
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      child: ExpansionTile(
+                        initiallyExpanded: index == 1,
+                        leading: const Icon(Icons.view_timeline_outlined),
+                        title: Text(
+                          _sessionTitle(latest.timestamp),
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                        subtitle: Text('${session.value.length} translations'),
+                        childrenPadding:
+                            const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                        children: session.value.map((entry) {
+                          return Dismissible(
+                            key: ValueKey(entry.id),
+                            background: Container(
+                              alignment: Alignment.centerRight,
+                              padding: const EdgeInsets.only(right: 20),
+                              color: Theme.of(context).colorScheme.error,
+                              child: const Icon(Icons.delete_outline,
+                                  color: Colors.white),
+                            ),
+                            confirmDismiss: (_) async {
+                              await _delete(entry);
+                              return false;
+                            },
+                            child: HistoryCardWidget(
+                              entry: entry,
+                              onTap: () => context
+                                  .read<TranslationProvider>()
+                                  .speak(entry.signLabel),
+                            ),
+                          );
+                        }).toList(),
                       ),
                     );
                   },
@@ -118,5 +143,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
         ),
       ),
     );
+  }
+
+  String _sessionTitle(DateTime timestamp) {
+    final local = timestamp.toLocal();
+    return 'Session ${local.month}/${local.day}/${local.year} ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
   }
 }

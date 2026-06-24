@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'core/constants/app_constants.dart';
 import 'core/services/auth_service.dart';
 import 'features/auth/splash_screen.dart';
+import 'features/auth/onboarding_screen.dart';
+import 'features/auth/permission_gate_screen.dart';
 import 'features/auth/welcome_screen.dart';
 import 'shared/theme/app_theme.dart';
 import 'shared/widgets/main_scaffold.dart';
@@ -29,6 +31,16 @@ class _NSLTranslateAppState extends State<NSLTranslateApp> {
             _fadePage(state, const WelcomeScreen()),
       ),
       GoRoute(
+        path: '/onboarding',
+        pageBuilder: (context, state) =>
+            _fadePage(state, const OnboardingScreen()),
+      ),
+      GoRoute(
+        path: '/permissions',
+        pageBuilder: (context, state) =>
+            _fadePage(state, const PermissionGateScreen()),
+      ),
+      GoRoute(
         path: '/home',
         pageBuilder: (context, state) => _fadePage(state, const MainScaffold()),
       ),
@@ -37,7 +49,9 @@ class _NSLTranslateAppState extends State<NSLTranslateApp> {
       final auth = AuthService();
       final location = state.matchedLocation;
       final allowed = auth.getCurrentUser() != null || auth.isGuest;
-      if (!allowed && location == '/home') return '/welcome';
+      if (!allowed && (location == '/home' || location == '/permissions')) {
+        return '/welcome';
+      }
       return null;
     },
   );

@@ -1,49 +1,12 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
+import 'package:path/path.dart' as p;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'auth_service.dart';
 import 'hive_service.dart';
 import 'sqlite_service.dart';
-
-/*
--- Run these in Supabase SQL editor
-
-create table profiles (
-  id uuid references auth.users primary key,
-  email text,
-  display_name text,
-  avatar_url text,
-  created_at timestamptz default now()
-);
-
-create table translation_history (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid references auth.users,
-  sign_label text not null,
-  confidence float not null,
-  recorded_at timestamptz not null,
-  created_at timestamptz default now()
-);
-
-create table sign_feedback (
-  id serial primary key,
-  user_id uuid references auth.users,
-  sign_label text not null,
-  video_path text not null,
-  submitted_at timestamptz not null,
-  synced_at timestamptz default now()
-);
-
--- RLS policies
-alter table profiles enable row level security;
-alter table translation_history enable row level security;
-alter table sign_feedback enable row level security;
-
-create policy "Users can manage own profile" on profiles for all using (auth.uid() = id);
-create policy "Users can manage own translations" on translation_history for all using (auth.uid() = user_id);
-create policy "Users can insert feedback" on sign_feedback for insert with check (true);
-create policy "Users can view own feedback" on sign_feedback for select using (auth.uid() = user_id or user_id is null);
-*/
 
 class SyncService {
   SyncService({
@@ -70,6 +33,7 @@ class SyncService {
           'user_id': user.id,
           'sign_label': entry.signLabel,
           'confidence': entry.confidence,
+          'session_id': entry.sessionId,
           'recorded_at': entry.timestamp.toUtc().toIso8601String(),
           'created_at': DateTime.now().toUtc().toIso8601String(),
         });
@@ -85,14 +49,14 @@ class SyncService {
 
   Future<int> syncFeedback() async {
     final user = _authService.getCurrentUser();
-    if (_authService.isGuest) return 0;
     var synced = 0;
     for (final entry in await _sqliteService.getUnsynced()) {
       try {
+        final videoPath = await _uploadContributionVideo(entry.videoPath);
         await _client.from('sign_feedback').insert({
           'user_id': user?.id,
           'sign_label': entry.signLabel,
-          'video_path': entry.videoPath,
+          'video_path': videoPath,
           'submitted_at': entry.submittedAt.toUtc().toIso8601String(),
           'synced_at': DateTime.now().toUtc().toIso8601String(),
         });
@@ -106,6 +70,21 @@ class SyncService {
       }
     }
     return synced;
+  }
+
+  Future<String> _uploadContributionVideo(String localPath) async {
+    final file = File(localPath);
+    if (!await file.exists()) return localPath;
+    final name =
+        '${DateTime.now().millisecondsSinceEpoch}_${p.basename(localPath)}';
+    final storagePath = 'contributions/$name';
+    await _client.storage.from('sign-feedback-videos').uploadBinary(
+          storagePath,
+          await file.readAsBytes(),
+          fileOptions:
+              const FileOptions(contentType: 'video/mp4', upsert: true),
+        );
+    return storagePath;
   }
 
   Future<int> performFullSync() async {

@@ -1,50 +1,132 @@
-import 'dart:math';
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
+import 'package:tflite_flutter/tflite_flutter.dart';
 
 import '../constants/app_constants.dart';
 import '../models/sign_result.dart';
+import 'model_update_service.dart';
 
-// INFERENCE SERVICE - AI STUB
-//
-// This service is intentionally stubbed. When the TFLite LSTM model
-// is ready, replace the body of runInference() with:
-//   1. Load nsl_model.tflite via tflite_flutter
-//   2. Accept List<List<double>> frameBuffer (shape: [30, 1662])
-//   3. Run interpreter.run(input, output)
-//   4. Parse softmax output, return SignResult
-//
-// The rest of the app calls only this interface - zero changes needed elsewhere.
+enum InferenceStatus {
+  idle,
+  ready,
+  modelMissing,
+  failed,
+}
+
 class InferenceService {
-  bool _isInitialized = false;
-  final Random _random = Random();
+  Interpreter? _interpreter;
+  List<String> _labels = AppConstants.nslVocabulary;
+  InferenceStatus _status = InferenceStatus.idle;
+  String? _errorMessage;
+  bool _loadedFromDisk = false;
+
+  bool get isInitialized => _status == InferenceStatus.ready;
+  InferenceStatus get status => _status;
+  String? get errorMessage => _errorMessage;
+  List<String> get labels => List.unmodifiable(_labels);
+
+  /// True when the active interpreter was loaded from a file on disk
+  /// (i.e. an OTA model update was applied on a previous run).
+  bool get loadedFromDisk => _loadedFromDisk;
 
   Future<void> initialize() async {
-    // TODO: Load TFLite model from assets/models/nsl_model.tflite.
-    await Future<void>.delayed(const Duration(milliseconds: 300));
-    _isInitialized = true;
+    try {
+      _labels = await _loadLabels();
+      _interpreter = await _resolveInterpreter();
+      _status = InferenceStatus.ready;
+      _errorMessage = null;
+    } on FlutterError catch (error) {
+      _status = InferenceStatus.modelMissing;
+      _errorMessage = error.message;
+      debugPrint('TFLite model asset is not installed: ${error.message}');
+    } catch (error, stackTrace) {
+      _status = InferenceStatus.failed;
+      _errorMessage = error.toString();
+      debugPrint('TFLite initialization failed: $error\n$stackTrace');
+    }
   }
 
-  bool get isInitialized => _isInitialized;
+  /// Returns a TFLite interpreter loaded from the OTA-updated file in the
+  /// app documents directory if present, otherwise falls back to the model
+  /// bundled in the app's assets.
+  Future<Interpreter> _resolveInterpreter() async {
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final local = File(p.join(dir.path, ModelUpdateService.modelFileName));
+      if (await local.exists()) {
+        _loadedFromDisk = true;
+        return Interpreter.fromFile(local);
+      }
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Falling back to bundled TFLite asset: $error\n$stackTrace',
+      );
+    }
+    _loadedFromDisk = false;
+    return await Interpreter.fromAsset(AppConstants.modelAssetPath);
+  }
 
-  Future<SignResult?> runInference(List<List<double>> frameBuffer) async {
-    if (!_isInitialized) return null;
-    if (frameBuffer.length < AppConstants.frameBufferSize) return null;
+  Future<SignResult?> runInference(List<Float32List> frameBuffer) async {
+    final interpreter = _interpreter;
+    if (interpreter == null || _status != InferenceStatus.ready) return null;
+    if (frameBuffer.length != AppConstants.frameBufferSize) return null;
 
-    await Future<void>.delayed(const Duration(milliseconds: 80));
-    if (_random.nextDouble() < 0.08) return null;
+    final input = [
+      frameBuffer.map((frame) {
+        if (frame.length != AppConstants.featureVectorSize) {
+          throw ArgumentError.value(
+            frame.length,
+            'frame.length',
+            'Expected ${AppConstants.featureVectorSize} MediaPipe features.',
+          );
+        }
+        return frame;
+      }).toList(growable: false),
+    ];
+    final output = [
+      Float32List(_labels.length),
+    ];
 
-    final label = AppConstants
-        .nslVocabulary[_random.nextInt(AppConstants.nslVocabulary.length)];
-    final confidence = 0.52 + _random.nextDouble() * 0.47;
+    interpreter.run(input, output);
+    final probabilities = output.first;
+    var bestIndex = 0;
+    var bestConfidence = probabilities[0];
+    for (var index = 1; index < probabilities.length; index++) {
+      if (probabilities[index] > bestConfidence) {
+        bestIndex = index;
+        bestConfidence = probabilities[index];
+      }
+    }
 
     return SignResult(
-      label: label,
-      confidence: double.parse(confidence.toStringAsFixed(2)),
+      label: _labels[bestIndex],
+      confidence: bestConfidence,
       timestamp: DateTime.now(),
     );
   }
 
+  Future<List<String>> _loadLabels() async {
+    final raw = await rootBundle.loadString(AppConstants.labelsAssetPath);
+    final decoded = jsonDecode(raw);
+    if (decoded is List) {
+      return decoded.map((value) => value.toString()).toList(growable: false);
+    }
+    if (decoded is Map<String, dynamic>) {
+      final entries = decoded.entries.toList()
+        ..sort((a, b) => int.parse(a.key).compareTo(int.parse(b.key)));
+      return entries.map((entry) => entry.value.toString()).toList();
+    }
+    throw const FormatException('labels.json must be a list or index map.');
+  }
+
   void dispose() {
-    // TODO: Dispose TFLite interpreter.
-    _isInitialized = false;
+    _interpreter?.close();
+    _interpreter = null;
+    _status = InferenceStatus.idle;
   }
 }

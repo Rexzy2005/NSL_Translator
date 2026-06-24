@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app.dart';
+import 'core/config/app_config.dart';
 import 'core/providers/auth_provider.dart';
 import 'core/providers/settings_provider.dart';
 import 'core/providers/translation_provider.dart';
@@ -18,10 +19,8 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Supabase.initialize(
-    // TODO: Replace with environment-provided Supabase URL before release.
-    url: 'https://your-supabase-project.supabase.co',
-    // TODO: Replace with environment-provided Supabase anon key before release.
-    publishableKey: 'YOUR_SUPABASE_ANON_KEY',
+    url: AppConfig.supabaseUrl,
+    publishableKey: AppConfig.supabasePublishableKey,
   );
 
   await Hive.initFlutter();

@@ -15,6 +15,10 @@
 - Cleared targeted stale/corrupt Gradle project and plugin cache entries after a `zip END header not found` APK build failure.
 - Fixed Android Kotlin/Javac JVM target mismatch by pinning Kotlin compilation to JVM 17.
 - Built a debug APK successfully with the controlled Gradle command.
+- Added a Dart define based app configuration layer for Supabase and model endpoints.
+- Added `GUIDE.md` for mobile setup/run instructions.
+- Moved Supabase SQL into `supabase_schema.sql`.
+- Wired the Translate screen settings icon to open the Settings tab.
 
 ## Checklist
 - [x] Read implementation prompt
@@ -39,3 +43,5 @@
 - `android\gradlew.bat assembleDebug --no-daemon --console=plain --max-workers=2` completed successfully.
 - Debug APK output: `build\app\outputs\flutter-apk\app-debug.apk`.
 - `flutter devices` currently lists Windows, Chrome, and Edge; no Android device/emulator is connected.
+- `C:\flutter\bin\flutter.bat analyze` passes after the configuration update.
+- `C:\flutter\bin\flutter.bat test` passes after the configuration update.

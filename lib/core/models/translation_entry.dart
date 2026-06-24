@@ -6,6 +6,7 @@ class TranslationEntry {
   final double confidence;
   final DateTime timestamp;
   final bool syncedToCloud;
+  final String sessionId;
 
   const TranslationEntry({
     required this.id,
@@ -13,6 +14,7 @@ class TranslationEntry {
     required this.confidence,
     required this.timestamp,
     required this.syncedToCloud,
+    required this.sessionId,
   });
 
   TranslationEntry copyWith({
@@ -21,6 +23,7 @@ class TranslationEntry {
     double? confidence,
     DateTime? timestamp,
     bool? syncedToCloud,
+    String? sessionId,
   }) {
     return TranslationEntry(
       id: id ?? this.id,
@@ -28,6 +31,7 @@ class TranslationEntry {
       confidence: confidence ?? this.confidence,
       timestamp: timestamp ?? this.timestamp,
       syncedToCloud: syncedToCloud ?? this.syncedToCloud,
+      sessionId: sessionId ?? this.sessionId,
     );
   }
 }
@@ -49,13 +53,14 @@ class TranslationEntryAdapter extends TypeAdapter<TranslationEntry> {
       confidence: fields[2] as double,
       timestamp: fields[3] as DateTime,
       syncedToCloud: fields[4] as bool,
+      sessionId: fields[5] as String? ?? 'legacy-session',
     );
   }
 
   @override
   void write(BinaryWriter writer, TranslationEntry obj) {
     writer
-      ..writeByte(5)
+      ..writeByte(6)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -65,6 +70,8 @@ class TranslationEntryAdapter extends TypeAdapter<TranslationEntry> {
       ..writeByte(3)
       ..write(obj.timestamp)
       ..writeByte(4)
-      ..write(obj.syncedToCloud);
+      ..write(obj.syncedToCloud)
+      ..writeByte(5)
+      ..write(obj.sessionId);
   }
 }

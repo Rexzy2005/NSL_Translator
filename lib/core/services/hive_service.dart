@@ -75,6 +75,14 @@ class HiveService {
     return value is double ? value : defaultValue;
   }
 
+  Future<void> saveBoolSetting(String key, bool value) =>
+      settings.put(key, value);
+
+  bool? getBoolSetting(String key, {bool? defaultValue}) {
+    final value = settings.get(key, defaultValue: defaultValue);
+    return value is bool ? value : defaultValue;
+  }
+
   Future<void> dispose() async {
     await _translationBox?.close();
     await _settingsBox?.close();

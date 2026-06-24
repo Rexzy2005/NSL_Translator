@@ -13,6 +13,10 @@ class ModelUpdateService {
   ModelUpdateService({required HiveService hiveService})
       : _hiveService = hiveService;
 
+  /// Name of the bundled TFLite model and the staged / active model file on
+  /// disk. Kept in sync with [AppConstants.modelAssetPath].
+  static const String modelFileName = 'nsl_model_fp16.tflite';
+
   static const String _localVersionKey = 'local_model_version';
   static const String _stagedVersionKey = 'staged_model_version';
   final HiveService _hiveService;
@@ -43,14 +47,18 @@ class ModelUpdateService {
       if (version == null || version.isEmpty) {
         throw StateError('No remote model version is available.');
       }
+      // Use the configured endpoint, but if it points at the old filename,
+      // rewrite to the actual shipped model file.
+      final endpoint = _resolveDownloadEndpoint();
       final response = await http
-          .get(Uri.parse(AppConstants.modelDownloadEndpoint))
+          .get(Uri.parse(endpoint))
           .timeout(const Duration(minutes: 2));
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw StateError('Model download failed with ${response.statusCode}.');
       }
       final dir = await getApplicationDocumentsDirectory();
-      final staged = File(p.join(dir.path, 'nsl_model_staged.tflite'));
+      final staged =
+          File(p.join(dir.path, '${modelFileName.replaceFirst('.tflite', '')}_staged.tflite'));
       await staged.writeAsBytes(response.bodyBytes, flush: true);
       await _hiveService.saveStringSetting(_stagedVersionKey, version);
     } catch (error, stackTrace) {
@@ -59,14 +67,25 @@ class ModelUpdateService {
     }
   }
 
+  String _resolveDownloadEndpoint() {
+    final base = AppConstants.modelDownloadEndpoint;
+    if (base.contains(modelFileName)) return base;
+    // Strip the old placeholder filename and substitute the real one.
+    final directory = base.substring(0, base.lastIndexOf('/') + 1);
+    return '$directory$modelFileName';
+  }
+
   Future<void> applyUpdate() async {
     try {
       final dir = await getApplicationDocumentsDirectory();
-      final staged = File(p.join(dir.path, 'nsl_model_staged.tflite'));
+      final staged = File(p.join(
+        dir.path,
+        '${modelFileName.replaceFirst('.tflite', '')}_staged.tflite',
+      ));
       if (!await staged.exists()) {
         throw StateError('No staged model file exists.');
       }
-      final active = File(p.join(dir.path, 'nsl_model.tflite'));
+      final active = File(p.join(dir.path, modelFileName));
       if (await active.exists()) {
         await active.delete();
       }

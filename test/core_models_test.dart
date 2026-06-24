@@ -6,7 +6,7 @@ import 'package:nsl_translate/core/models/translation_entry.dart';
 void main() {
   test('SignResult reports high confidence at threshold', () {
     final result = SignResult(
-      label: 'Hello',
+      label: 'greetings',
       confidence: 0.80,
       timestamp: DateTime.utc(2026, 6, 9),
     );
@@ -18,27 +18,29 @@ void main() {
     final timestamp = DateTime.utc(2026, 6, 9, 12);
     final entry = TranslationEntry(
       id: 'entry-id',
-      signLabel: 'Help',
+      signLabel: 'greetings',
       confidence: 0.72,
       timestamp: timestamp,
       syncedToCloud: false,
+      sessionId: 'session-id',
     );
 
     final synced = entry.copyWith(syncedToCloud: true);
 
     expect(synced.id, 'entry-id');
-    expect(synced.signLabel, 'Help');
+    expect(synced.signLabel, 'greetings');
     expect(synced.confidence, 0.72);
     expect(synced.timestamp, timestamp);
     expect(synced.syncedToCloud, isTrue);
+    expect(synced.sessionId, 'session-id');
   });
 
   test('FeedbackEntry maps to and from SQLite row shape', () {
     final submittedAt = DateTime.utc(2026, 6, 9, 13, 30);
     final entry = FeedbackEntry(
       id: 7,
-      signLabel: 'Doctor',
-      videoPath: 'pending_video',
+      signLabel: 'good_morning',
+      videoPath: '/tmp/sign_12345.mp4',
       submittedAt: submittedAt,
       synced: false,
     );
@@ -46,8 +48,8 @@ void main() {
     final restored = FeedbackEntry.fromMap(entry.toMap());
 
     expect(restored.id, 7);
-    expect(restored.signLabel, 'Doctor');
-    expect(restored.videoPath, 'pending_video');
+    expect(restored.signLabel, 'good_morning');
+    expect(restored.videoPath, '/tmp/sign_12345.mp4');
     expect(restored.submittedAt, submittedAt);
     expect(restored.synced, isFalse);
   });

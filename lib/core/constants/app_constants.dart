@@ -1,34 +1,30 @@
+import '../config/app_config.dart';
+
 class AppConstants {
   static const String appName = 'NSL Translate';
   static const double confidenceThreshold = 0.80;
   static const int frameBufferSize = 30;
+  static const int featureVectorSize = 1662;
   static const int frameRate = 30;
+  static const String modelAssetPath = 'assets/models/nsl_model_fp16.tflite';
+  static const String labelsAssetPath = 'assets/models/labels.json';
   static const String hiveTranslationBox = 'translations';
   static const String hiveSettingsBox = 'settings';
-  static const String modelVersionEndpoint =
-      'https://your-supabase-project.supabase.co/storage/v1/object/public/models/version.json';
-  static const String modelDownloadEndpoint =
-      'https://your-supabase-project.supabase.co/storage/v1/object/public/models/nsl_model.tflite';
+  static String get modelVersionEndpoint => AppConfig.modelVersionEndpoint;
+  static String get modelDownloadEndpoint => AppConfig.modelDownloadEndpoint;
+  /// The 12 signs the model was trained on (must match labels.json).
   static const List<String> nslVocabulary = [
-    'Hello',
-    'Thank you',
-    'Help',
-    'Yes',
-    'No',
-    'Please',
-    'Sorry',
-    'Hospital',
-    'Doctor',
-    'Pain',
-    'Medicine',
-    'Water',
-    'Food',
-    'Police',
-    'School',
-    'Money',
-    'I/Me',
-    'You',
-    'Family',
-    'Emergency',
+    'good_afternoon',
+    'good_evening',
+    'good_morning',
+    'good_night',
+    'greetings',
+    'how',
+    'what',
+    'whatever',
+    'when',
+    'where',
+    'which',
+    'who',
   ];
 }

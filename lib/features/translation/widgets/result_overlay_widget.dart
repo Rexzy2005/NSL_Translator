@@ -57,14 +57,11 @@ class _ResultOverlayWidgetState extends State<ResultOverlayWidget> {
           alignment: Alignment.bottomCenter,
           child: Container(
             width: double.infinity,
-            constraints: BoxConstraints(
-              minHeight: MediaQuery.sizeOf(context).height * 0.28,
-            ),
-            padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 92),
+            padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.72),
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(24)),
+              color: Colors.black.withValues(alpha: 0.76),
+              borderRadius: BorderRadius.circular(18),
             ),
             child: result == null
                 ? const SizedBox.shrink()
@@ -79,7 +76,7 @@ class _ResultOverlayWidgetState extends State<ResultOverlayWidget> {
                               result.label,
                               style: const TextStyle(
                                 color: Colors.white,
-                                fontSize: 32,
+                                fontSize: 28,
                                 fontWeight: FontWeight.w800,
                               ),
                             ),

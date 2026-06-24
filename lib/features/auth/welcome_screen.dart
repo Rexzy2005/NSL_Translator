@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -23,7 +24,7 @@ class WelcomeScreen extends StatelessWidget {
   ) async {
     try {
       await action(context.read<AuthProvider>());
-      if (context.mounted) context.go('/home');
+      if (context.mounted) context.go('/permissions');
     } catch (error) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -72,13 +73,10 @@ class WelcomeScreen extends StatelessWidget {
                             context,
                             (provider) => provider.signInWithGoogle(),
                           ),
-                  icon: const Text(
-                    'G',
-                    style: TextStyle(
-                      color: Color(0xFF4285F4),
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                    ),
+                  icon: SvgPicture.asset(
+                    'assets/images/google_g.svg',
+                    width: 22,
+                    height: 22,
                   ),
                   label: const Text(_google),
                   style: OutlinedButton.styleFrom(

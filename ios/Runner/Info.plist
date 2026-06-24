@@ -15,9 +15,13 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>NSL Translate needs camera access to recognize sign language gestures.</string>
+	<string>NSL Translate needs camera access to recognize sign language gestures and to record sign videos for dataset contributions.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Required by the camera plugin.</string>
+	<string>NSL Translate needs microphone access to record audio with your sign videos for dataset contributions.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>NSL Translate saves your recorded sign videos so you can review them before contributing to the dataset.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>NSL Translate saves recorded sign videos to your photo library when you choose to export them.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UISupportedInterfaceOrientations</key>

@@ -22,18 +22,41 @@ class TranslationProvider extends ChangeNotifier {
   final SettingsProvider _settings;
   final FlutterTts _tts = FlutterTts();
   final Uuid _uuid = const Uuid();
+  String? _activeSessionId;
   SignResult? _currentResult;
   final List<SignResult> _sessionHistory = [];
   bool _isProcessing = false;
   bool _isCameraActive = true;
+  bool _isTranslating = false;
 
   SignResult? get currentResult => _currentResult;
   List<SignResult> get sessionHistory => List.unmodifiable(_sessionHistory);
   bool get isProcessing => _isProcessing;
   bool get isCameraActive => _isCameraActive;
+  bool get isTranslating => _isTranslating;
   InferenceService get inferenceService => _inferenceService;
+  String? get sessionId => _activeSessionId;
+
+  void startTranslating() {
+    _activeSessionId = _uuid.v4();
+    _currentResult = null;
+    _sessionHistory.clear();
+    _isProcessing = false;
+    _isTranslating = true;
+    notifyListeners();
+  }
+
+  Future<void> stopTranslating() async {
+    _isTranslating = false;
+    _isProcessing = false;
+    _activeSessionId = null;
+    await stopSpeaking();
+    notifyListeners();
+  }
 
   Future<void> setResult(SignResult result) async {
+    final sessionId = _activeSessionId;
+    if (!_isTranslating || sessionId == null) return;
     _currentResult = result;
     _sessionHistory.insert(0, result);
     _isProcessing = false;
@@ -46,9 +69,11 @@ class TranslationProvider extends ChangeNotifier {
           confidence: result.confidence,
           timestamp: result.timestamp,
           syncedToCloud: false,
+          sessionId: sessionId,
         ),
       );
-      if (result.confidence >= _settings.confidenceThreshold) {
+      if (_settings.ttsEnabled &&
+          result.confidence >= _settings.confidenceThreshold) {
         await speak(result.label);
       }
     } catch (error, stackTrace) {
@@ -67,6 +92,7 @@ class TranslationProvider extends ChangeNotifier {
   }
 
   Future<void> speak(String label) async {
+    if (!_settings.ttsEnabled) return;
     try {
       await _tts.setLanguage(_settings.ttsLanguage);
       await _tts.setSpeechRate(_settings.ttsRate);
@@ -76,7 +102,11 @@ class TranslationProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> stopSpeaking() => _tts.stop();
+
   void clearSession() {
+    _activeSessionId = null;
+    _isTranslating = false;
     _currentResult = null;
     _sessionHistory.clear();
     notifyListeners();
