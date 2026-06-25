@@ -6,6 +6,7 @@ import '../../core/providers/translation_provider.dart';
 import '../../core/services/hive_service.dart';
 import '../../core/services/sync_service.dart';
 import 'widgets/history_card_widget.dart';
+import 'widgets/history_empty_state.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -78,10 +79,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
           child: _items.isEmpty
               ? ListView(
                   children: const [
-                    SizedBox(height: 160),
-                    Icon(Icons.history_outlined, size: 56),
-                    SizedBox(height: 16),
-                    Center(child: Text('No translations yet. Start signing.')),
+                    SizedBox(height: 100),
+                    HistoryEmptyState(),
                   ],
                 )
               : ListView.builder(

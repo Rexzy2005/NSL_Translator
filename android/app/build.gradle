@@ -16,7 +16,9 @@ android {
 
     defaultConfig {
         applicationId = "com.example.nsl_translate"
-        minSdkVersion = flutter.minSdkVersion
+        // MediaPipe Tasks Vision requires API 24+; Flutter's default minSdk
+        // can be lower than that, so pin a safe floor here.
+        minSdk = 24
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -27,6 +29,18 @@ android {
             signingConfig = signingConfigs.debug
         }
     }
+
+    // MediaPipe reads the .task model files via mmap; AAPT must not
+    // recompress them or the loader fails at runtime.
+    aaptOptions {
+        noCompress "tflite", "task"
+    }
+}
+
+dependencies {
+    // MediaPipe Tasks Vision — landmarker-only modules for pose, hand, face.
+    // We assemble the 1662-float holistic feature vector in Dart-side logic.
+    implementation 'com.google.mediapipe:tasks-vision:0.10.14'
 }
 
 kotlin {

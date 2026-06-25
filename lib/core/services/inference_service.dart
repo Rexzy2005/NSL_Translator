@@ -13,12 +13,13 @@ import 'model_update_service.dart';
 
 enum InferenceStatus {
   idle,
+  loading,
   ready,
   modelMissing,
   failed,
 }
 
-class InferenceService {
+class InferenceService extends ChangeNotifier {
   Interpreter? _interpreter;
   List<String> _labels = AppConstants.nslVocabulary;
   InferenceStatus _status = InferenceStatus.idle;
@@ -35,20 +36,42 @@ class InferenceService {
   bool get loadedFromDisk => _loadedFromDisk;
 
   Future<void> initialize() async {
+    await reloadModel();
+  }
+
+  /// Closes the current interpreter and re-resolves the model from the best
+  /// available source (OTA-updated file in the documents dir, falling back to
+  /// the bundled asset). Safe to call from any isolate — old interpreter is
+  /// released before the new one is opened.
+  Future<void> reloadModel() async {
+    _setStatus(InferenceStatus.loading, null);
     try {
+      // Release the existing interpreter before opening a new one.
+      final previous = _interpreter;
+      _interpreter = null;
+      if (previous != null) {
+        try {
+          previous.close();
+        } catch (error, stackTrace) {
+          debugPrint('Failed to close previous interpreter: $error\n$stackTrace');
+        }
+      }
       _labels = await _loadLabels();
       _interpreter = await _resolveInterpreter();
-      _status = InferenceStatus.ready;
-      _errorMessage = null;
+      _setStatus(InferenceStatus.ready, null);
     } on FlutterError catch (error) {
-      _status = InferenceStatus.modelMissing;
-      _errorMessage = error.message;
+      _setStatus(InferenceStatus.modelMissing, error.message);
       debugPrint('TFLite model asset is not installed: ${error.message}');
     } catch (error, stackTrace) {
-      _status = InferenceStatus.failed;
-      _errorMessage = error.toString();
+      _setStatus(InferenceStatus.failed, error.toString());
       debugPrint('TFLite initialization failed: $error\n$stackTrace');
     }
+  }
+
+  void _setStatus(InferenceStatus status, String? errorMessage) {
+    _status = status;
+    _errorMessage = errorMessage;
+    notifyListeners();
   }
 
   /// Returns a TFLite interpreter loaded from the OTA-updated file in the
@@ -94,19 +117,25 @@ class InferenceService {
 
     interpreter.run(input, output);
     final probabilities = output.first;
-    var bestIndex = 0;
-    var bestConfidence = probabilities[0];
-    for (var index = 1; index < probabilities.length; index++) {
-      if (probabilities[index] > bestConfidence) {
-        bestIndex = index;
-        bestConfidence = probabilities[index];
-      }
-    }
+    // Sort descending so alternatives[] below contains the top predictions
+    // (the winner first, then runner-ups) without rescanning the array.
+    final ranked = List<int>.generate(probabilities.length, (i) => i)
+      ..sort((a, b) => probabilities[b].compareTo(probabilities[a]));
+    const topN = 3;
+    final top = ranked.take(topN).toList(growable: false);
+    final winnerIndex = top.first;
+    final alternatives = top
+        .map((index) => Prediction(
+              label: _labels[index],
+              confidence: probabilities[index],
+            ))
+        .toList(growable: false);
 
     return SignResult(
-      label: _labels[bestIndex],
-      confidence: bestConfidence,
+      label: _labels[winnerIndex],
+      confidence: probabilities[winnerIndex],
       timestamp: DateTime.now(),
+      alternatives: alternatives,
     );
   }
 
@@ -124,9 +153,11 @@ class InferenceService {
     throw const FormatException('labels.json must be a list or index map.');
   }
 
+  @override
   void dispose() {
     _interpreter?.close();
     _interpreter = null;
     _status = InferenceStatus.idle;
+    super.dispose();
   }
 }

@@ -31,6 +31,15 @@ class AuthProvider extends ChangeNotifier {
     });
   }
 
+  /// Browser-based fallback path. Opens a Chrome custom tab / system browser
+  /// to Supabase's hosted Google OAuth page. Use this when the native
+  /// account-picker fails (e.g. SHA-1 not registered).
+  Future<void> signInWithGoogleViaBrowser() async {
+    await _runAuthAction(() async {
+      await _authService.signInWithGoogleViaBrowser();
+    });
+  }
+
   Future<void> continueAsGuest() async {
     await _runAuthAction(() async {
       await _authService.continueAsGuest();

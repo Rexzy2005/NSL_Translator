@@ -6,6 +6,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/models/sign_result.dart';
 import '../../../core/services/inference_service.dart';
 import '../../../core/services/mediapipe_landmark_extractor.dart';
+import '../../../core/services/model_update_service.dart';
 import '../../../core/services/sequence_buffer.dart';
 
 class CameraViewWidget extends StatefulWidget {
@@ -16,6 +17,8 @@ class CameraViewWidget extends StatefulWidget {
     required this.lensDirection,
     required this.onResult,
     required this.onCameraReady,
+    this.onFrameCountChanged,
+    this.onSimulatedModeChanged,
     this.landmarkExtractor,
   });
 
@@ -24,6 +27,8 @@ class CameraViewWidget extends StatefulWidget {
   final CameraLensDirection lensDirection;
   final ValueChanged<SignResult> onResult;
   final ValueChanged<CameraController> onCameraReady;
+  final ValueChanged<int>? onFrameCountChanged;
+  final ValueChanged<bool>? onSimulatedModeChanged;
   final MediaPipeLandmarkExtractor? landmarkExtractor;
 
   @override
@@ -31,7 +36,7 @@ class CameraViewWidget extends StatefulWidget {
 }
 
 class _CameraViewWidgetState extends State<CameraViewWidget> {
-  late final MediaPipeLandmarkExtractor _landmarkExtractor =
+  late MediaPipeLandmarkExtractor _landmarkExtractor =
       widget.landmarkExtractor ?? MethodChannelMediaPipeLandmarkExtractor();
   final SequenceBuffer _sequenceBuffer = SequenceBuffer();
   CameraController? _controller;
@@ -44,6 +49,7 @@ class _CameraViewWidgetState extends State<CameraViewWidget> {
   bool _loading = true;
   bool _sceneDetected = false;
   bool _mediaPipeUnavailable = false;
+  bool _usingSimulatedLandmarks = false;
   bool _processingFrame = false;
   bool _runningInference = false;
 
@@ -106,13 +112,16 @@ class _CameraViewWidgetState extends State<CameraViewWidget> {
   }
 
   String? _readinessMessage() {
-    if (widget.inferenceService.isInitialized) return null;
-    return switch (widget.inferenceService.status) {
+    final service = widget.inferenceService;
+    if (service.isInitialized) return null;
+    const filename = ModelUpdateService.modelFileName;
+    return switch (service.status) {
+      InferenceStatus.ready => null,
+      InferenceStatus.idle => 'Preparing translator...',
+      InferenceStatus.loading => 'Loading model...',
       InferenceStatus.modelMissing =>
-        'Add assets/models/nsl_model.tflite to enable translation.',
-      InferenceStatus.failed =>
-        widget.inferenceService.errorMessage ?? 'Model failed to load.',
-      _ => 'Model is not ready yet.',
+        'Model not found. Place $filename in assets/models/ to enable translation.',
+      InferenceStatus.failed => service.errorMessage ?? 'Model failed to load.',
     };
   }
 
@@ -153,26 +162,44 @@ class _CameraViewWidgetState extends State<CameraViewWidget> {
         setState(() => _latestLandmarks = landmarkResult);
       }
       _sequenceBuffer.add(landmarkResult.features);
+      // Bubble the frame count up so the status bar can show "12/30".
+      widget.onFrameCountChanged?.call(_sequenceBuffer.length);
       if (!_sequenceBuffer.isReady) return;
       _runningInference = true;
       final signResult = await widget.inferenceService
           .runInference(_sequenceBuffer.snapshot());
       if (signResult != null && mounted) widget.onResult(signResult);
     } on MissingPluginException {
-      if (mounted) {
+      // Native MediaPipe channel not registered (emulator / partial build).
+      // Fall back to a Dart-side simulated landmark extractor so the rest of
+      // the pipeline is still exercisable end-to-end.
+      if (mounted && !_usingSimulatedLandmarks) {
         setState(() {
-          _mediaPipeUnavailable = true;
-          _pipelineMessage =
-              'MediaPipe Holistic is not connected in the native app layer.';
+          _landmarkExtractor = SimulatedLandmarkExtractor();
+          _usingSimulatedLandmarks = true;
+          _mediaPipeUnavailable = false;
+          _pipelineMessage = 'Demo mode: native MediaPipe is not connected.';
         });
+        widget.onSimulatedModeChanged?.call(true);
       }
     } on PlatformException catch (error) {
       if (mounted) {
-        setState(() {
-          _mediaPipeUnavailable = error.code == 'MEDIAPIPE_NOT_CONFIGURED';
-          _pipelineMessage =
-              error.message ?? 'MediaPipe landmark extraction failed.';
-        });
+        final notConfigured = error.code == 'MEDIAPIPE_NOT_CONFIGURED';
+        if (notConfigured && !_usingSimulatedLandmarks) {
+          setState(() {
+            _landmarkExtractor = SimulatedLandmarkExtractor();
+            _usingSimulatedLandmarks = true;
+            _mediaPipeUnavailable = false;
+            _pipelineMessage = 'Demo mode: native MediaPipe is not configured.';
+          });
+          widget.onSimulatedModeChanged?.call(true);
+        } else {
+          setState(() {
+            _mediaPipeUnavailable = notConfigured;
+            _pipelineMessage =
+                error.message ?? 'MediaPipe landmark extraction failed.';
+          });
+        }
       }
     } catch (error) {
       if (mounted) {
@@ -319,6 +346,45 @@ class _CameraViewWidgetState extends State<CameraViewWidget> {
             ),
           ),
         ),
+        if (_usingSimulatedLandmarks)
+          SafeArea(
+            child: Align(
+              alignment: Alignment.topRight,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(0, 18, 18, 0),
+                child: Tooltip(
+                  message: 'Native MediaPipe Holistic channel is not connected. '
+                      'Showing simulated landmarks so the rest of the pipeline '
+                      'is exercisable end-to-end.',
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.shade700,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.science_outlined,
+                            color: Colors.white, size: 14),
+                        SizedBox(width: 4),
+                        Text(
+                          'Demo mode',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.4,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }

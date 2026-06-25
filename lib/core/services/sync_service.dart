@@ -49,12 +49,13 @@ class SyncService {
 
   Future<int> syncFeedback() async {
     final user = _authService.getCurrentUser();
+    if (user == null || _authService.isGuest) return 0;
     var synced = 0;
     for (final entry in await _sqliteService.getUnsynced()) {
       try {
         final videoPath = await _uploadContributionVideo(entry.videoPath);
         await _client.from('sign_feedback').insert({
-          'user_id': user?.id,
+          'user_id': user.id,
           'sign_label': entry.signLabel,
           'video_path': videoPath,
           'submitted_at': entry.submittedAt.toUtc().toIso8601String(),

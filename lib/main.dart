@@ -14,6 +14,7 @@ import 'core/services/inference_service.dart';
 import 'core/services/model_update_service.dart';
 import 'core/services/sqlite_service.dart';
 import 'core/services/sync_service.dart';
+import 'core/services/tts_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -35,23 +36,35 @@ Future<void> main() async {
   await inferenceService.initialize();
 
   final settingsProvider = SettingsProvider(hiveService);
+  // Pre-warm TTS with the user's last-used language + rate so the first
+  // translation is heard immediately. Fire-and-forget — if it fails the
+  // service handles the en-NG → en-US fallback internally.
+  final ttsService = TtsService();
+  unawaited(ttsService.warmUp(
+    language: settingsProvider.ttsLanguage,
+    rate: settingsProvider.ttsRate,
+  ));
+
   final syncService = SyncService(
     hiveService: hiveService,
     sqliteService: sqliteService,
   );
   final connectivityService = ConnectivityService(syncService: syncService);
-  final modelUpdateService = ModelUpdateService(hiveService: hiveService);
+  final modelUpdateService = ModelUpdateService(hiveService: hiveService)
+    ..onModelApplied = inferenceService.reloadModel;
 
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider.value(value: settingsProvider),
+        ChangeNotifierProvider(create: (_) => ttsService),
         ChangeNotifierProvider(
           create: (context) => TranslationProvider(
             hiveService: hiveService,
             inferenceService: inferenceService,
             settings: context.read<SettingsProvider>(),
+            ttsService: ttsService,
           ),
         ),
         Provider<HiveService>(
@@ -78,4 +91,8 @@ Future<void> main() async {
       child: const NSLTranslateApp(),
     ),
   );
+}
+
+void unawaited(Future<void> future) {
+  // Intentionally not awaited; errors are logged inside TtsService.
 }

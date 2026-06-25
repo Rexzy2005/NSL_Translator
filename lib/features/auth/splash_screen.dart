@@ -6,7 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/services/auth_service.dart';
 import '../../core/services/hive_service.dart';
-import '../../shared/theme/app_theme.dart';
+import '../../shared/widgets/brand_logo.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -15,10 +15,15 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
-  static const String _logo = 'NSL';
-  static const String _subtitle = 'Translate';
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
+  static const String _tagline = 'Bridging the communication gap';
   bool _started = false;
+
+  late final AnimationController _gradientController = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 6),
+  )..repeat(reverse: true);
 
   @override
   void initState() {
@@ -55,45 +60,56 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   @override
+  void dispose() {
+    _gradientController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SizedBox(
-            height: 140,
-            child: Stack(
-              alignment: Alignment.center,
+      body: AnimatedBuilder(
+        animation: _gradientController,
+        builder: (context, child) {
+          return Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color.lerp(
+                    const Color(0xFFE8F8F1),
+                    const Color(0xFFD9F1F9),
+                    _gradientController.value,
+                  )!,
+                  const Color(0xFFF8F9FA),
+                ],
+              ),
+            ),
+            child: child,
+          );
+        },
+        child: SafeArea(
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                AnimatedSlide(
-                  offset: _started ? const Offset(-0.68, 0) : Offset.zero,
-                  duration: const Duration(milliseconds: 900),
-                  curve: Curves.easeOutCubic,
-                  child: const Text(
-                    _logo,
-                    style: TextStyle(
-                      color: AppTheme.primary,
-                      fontSize: 64,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0,
-                    ),
-                  ),
-                ),
-                AnimatedSlide(
-                  offset: _started
-                      ? const Offset(0.78, 0.12)
-                      : const Offset(1.5, 0.12),
-                  duration: const Duration(milliseconds: 900),
-                  curve: Curves.easeOutCubic,
-                  child: AnimatedOpacity(
-                    opacity: _started ? 1 : 0,
-                    duration: const Duration(milliseconds: 500),
-                    child: const Text(
-                      _subtitle,
-                      style: TextStyle(
-                        fontSize: 27,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0,
-                      ),
+                BrandLogo(revealed: _started),
+                AnimatedOpacity(
+                  opacity: _started ? 1 : 0,
+                  duration: const Duration(milliseconds: 600),
+                  curve: Curves.easeOut,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 20),
+                    child: Text(
+                      _tagline,
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(
+                            color: const Color(0xFF6B7280),
+                            fontWeight: FontWeight.w500,
+                          ),
                     ),
                   ),
                 ),

@@ -22,6 +22,11 @@ class ModelUpdateService {
   final HiveService _hiveService;
   String? _remoteVersion;
 
+  /// Optional hook invoked after [applyUpdate] finishes, so the
+  /// [InferenceService] can hot-reload the new model without an app restart.
+  /// Set from `main.dart` after both services are constructed.
+  Future<void> Function()? onModelApplied;
+
   Future<bool> checkForUpdate() async {
     try {
       final response = await http
@@ -94,6 +99,17 @@ class ModelUpdateService {
               defaultValue: '0.0.0') ??
           '0.0.0';
       await _hiveService.saveStringSetting(_localVersionKey, stagedVersion);
+      // Hot-reload the interpreter so the new model is ready immediately —
+      // no app restart required.
+      final hook = onModelApplied;
+      if (hook != null) {
+        try {
+          await hook();
+        } catch (error, stackTrace) {
+          debugPrint(
+              'Inference reload after model apply failed: $error\n$stackTrace');
+        }
+      }
     } catch (error, stackTrace) {
       debugPrint('Applying model update failed: $error\n$stackTrace');
       rethrow;

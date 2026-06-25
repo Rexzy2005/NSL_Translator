@@ -59,11 +59,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await settingsProvider.refreshLocalModelVersion();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Model applied. Please restart NSL Translate to use it.',
-          ),
-        ),
+        const SnackBar(content: Text('Model updated and ready to use.')),
       );
     } finally {
       if (mounted) setState(() => _checking = false);

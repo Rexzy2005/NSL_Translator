@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Strings injected into the Android resources.
+
+  - `default_web_client_id` is read by the `google_sign_in` plugin (v6.x) on
+    Android to identify which Google OAuth Web client to authenticate against.
+    It must match the Web OAuth Client ID configured in Supabase
+    (Authentication -> Providers -> Google -> "Client ID (for OAuth)") and in
+    the Google Cloud Console credential of type "Web application".
+  - Without this string, the Sign-in with Google button throws a
+    PlatformException at runtime on Android.
+-->
+<resources>
+    <string name="default_web_client_id">527745842570-g7gsms10aaksoakfsbtdudvph1hf82ua.apps.googleusercontent.com</string>
+</resources>

@@ -9,17 +9,7 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
-            "nsl_translate/mediapipe"
-        ).setMethodCallHandler { call, result ->
-            when (call.method) {
-                "extractHolisticLandmarks" -> result.error(
-                    "MEDIAPIPE_NOT_CONFIGURED",
-                    "Native MediaPipe Holistic landmark extraction is not configured yet.",
-                    null
-                )
-                "dispose" -> result.success(null)
-                else -> result.notImplemented()
-            }
-        }
+            NslMethodChannelHandler.CHANNEL_NAME
+        ).setMethodCallHandler(NslMethodChannelHandler(applicationContext))
     }
 }
